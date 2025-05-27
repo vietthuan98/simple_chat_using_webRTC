@@ -8,10 +8,10 @@ Open two tabs at `http://localhost:3000/`:
 2. Tab 2: Clicking `Start callee`
 3. Can chat
 
-# A. Signaling server
+# Signaling server
 - Nodejs
 - RestfulAPI
-# B. Client (caller + callee)
+# Client (caller + callee)
 1. Caller: send offer
 2. Callee: get offer, send answer
 3. Caller: get answer, send ICE offer-candidate
@@ -46,6 +46,9 @@ Client A (Caller)                          Signaling Server                     
 ```
 ### Plus
 What do the SDP offer and the ICE Candidate mean? (from ChatGPT ^^)
+- **SDP Offer**: WebRTC needs to know how each peer is configured, what media formats they support, and how to communicate.
+- **ICE Candidate**: Most devices are behind NATs/firewalls. ICE helps them find the best way to connect, even in restricted environments.
+
 | Term              | What it Means                                      | Purpose                           |
 | ----------------- | -------------------------------------------------- | --------------------------------- |
 | **SDP Offer**     | Capabilities from caller (media, codecs, channels) | Start connection negotiation      |
