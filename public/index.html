@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebRTC DataChannel with REST Signaling</title>
+  </head>
+  <body>
+    <h2>WebRTC Data Channel</h2>
+
+    <!-- Buttons to start as caller or callee -->
+    <button onclick="start(true)">Start as Caller</button>
+    <button onclick="start(false)">Start as Callee</button>
+    <br /><br />
+
+    <!-- UI for sending a message -->
+    <textarea id="msg" placeholder="Type message here..."></textarea>
+    <button onclick="sendMessage()">Send</button>
+
+    <!-- Display received message -->
+    <div id="chatBox">
+      <h3><strong>Chat</strong></h3>
+    </div>
+
+    <script>
+      let pc, channel;
+      const chatBox = document.getElementById("chatBox");
+
+      // Start function to initialize connection
+      async function start(caller) {
+        pc = new RTCPeerConnection();
+
+        // Handle discovered ICE candidates
+        pc.onicecandidate = (e) => {
+          if (e.candidate) {
+            const path = caller ? "offer-candidate" : "answer-candidate";
+            fetch(`/${path}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(e.candidate),
+            });
+          }
+        };
+
+        if (caller) {
+          // Caller creates the data channel
+          channel = pc.createDataChannel("chat");
+          setupChannel(channel); // Set message handlers
+
+          // Create and send SDP offer
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await fetch("/offer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(offer),
+          });
+
+          // Wait for callee's answer
+          waitForAnswer();
+          waitForCandidates("/answer-candidates");
+        } else {
+          // Callee waits for data channel
+          pc.ondatachannel = (e) => {
+            channel = e.channel;
+            setupChannel(channel);
+          };
+
+          // Get offer from signaling server
+          const offer = await (await fetch("/offer")).json();
+          await pc.setRemoteDescription(offer);
+
+          // Create and send answer
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await fetch("/answer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(answer),
+          });
+
+          // Fetch caller's ICE candidates
+          waitForCandidates("/offer-candidates");
+        }
+      }
+
+      // Handle incoming messages from the data channel
+      function setupChannel(ch) {
+        ch.onopen = () => console.log("Channel open!");
+        ch.onmessage = (e) => {
+            // Create from for chat message
+          const received = document.createElement("p");
+          received.innerText = e.data;
+          received.setAttribute("style", "text-align: left;");
+          chatBox.appendChild(received);
+        };
+      }
+
+      // Send message over the data channel
+      function sendMessage() {
+        const msg = document.getElementById("msg").value;
+        // Create dom for chat message 
+        const sentMessage = document.createElement("p");
+        sentMessage.innerText = msg;
+        sentMessage.setAttribute("style", "text-align: right;");
+        chatBox.appendChild(sentMessage);
+        // Using webRTC to send message
+        channel.send(msg);
+      }
+
+      // Poll for the answer SDP until available
+      async function waitForAnswer() {
+        const poll = async () => {
+          console.log("RUN get answer");
+          const answer = await (await fetch("/answer")).json();
+          if (answer && answer.type === "answer") {
+            await pc.setRemoteDescription(answer);
+          } else {
+            setTimeout(poll, 1000); // Retry every second
+          }
+        };
+        poll();
+      }
+
+      // Poll for ICE candidates from other peer
+      async function waitForCandidates(path) {
+        const seen = new Set();
+        const poll = async () => {
+          const list = await (await fetch(path)).json();
+          for (const cand of list) {
+            const id = cand.candidate;
+            if (!seen.has(id) && id) {
+              await pc.addIceCandidate(cand);
+              seen.add(id); // Avoid duplicates
+              clearTimeout(timeoutId);
+            }
+          }
+          setTimeout(poll, 1000); // Poll every second
+        };
+        poll();
+      }
+    </script>
+  </body>
+</html>
