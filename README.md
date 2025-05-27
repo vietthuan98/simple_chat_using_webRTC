@@ -1,3 +1,5 @@
+```
+
 Client A (Caller)                          Signaling Server                         Client B (Callee)
 -----------------                          -----------------                        -----------------
      |                                            |                                         |
@@ -21,3 +23,4 @@ Client A (Caller)                          Signaling Server                     
      |=========== Direct P2P Connection ==========|=========== Direct P2P Connection ======|
      |                                            |                                         |
      |<================= DataChannel =========================>|
+```
